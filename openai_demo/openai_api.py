@@ -16,10 +16,29 @@ from transformers import AutoModelForCausalLM, LlamaTokenizer, PreTrainedModel, 
     TextIteratorStreamer
 from PIL import Image
 from io import BytesIO
+import sys
 
-MODEL_PATH = os.environ.get('MODEL_PATH', 'THUDM/cogvlm-chat-hf')
+# get model name from input
+try:
+    model_name = sys.argv[1]
+    MODEL_PATH = os.environ.get('MODEL_PATH', f'../{model_name}')
+    PORT = sys.argv[2]
+    
+except:
+    MODEL_PATH = os.environ.get('MODEL_PATH', '../cogagent-vqa-hf')
+
+
+# MODEL_PATH = os.environ.get('MODEL_PATH', 'THUDM/cogvlm-chat-hf')
 TOKENIZER_PATH = os.environ.get("TOKENIZER_PATH", 'lmsys/vicuna-7b-v1.5')
+# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+# print(torch.cuda.device_count())
+
+# if torch.cuda.is_available() :
+#     DEVICE = 1
+# else:
+#     DEVICE = 'cpu'
+
 if os.environ.get('QUANT_ENABLED'):
     QUANT_ENABLED = True
 else:
@@ -148,7 +167,7 @@ async def list_models():
     An endpoint to list available models. It returns a list of model cards.
     This is useful for clients to query and understand what models are available for use.
     """
-    model_card = ModelCard(id="cogvlm-chat-17b")  # can be replaced by your model id like cogagent-chat-18b
+    model_card = ModelCard(id=model_name)  # can be replaced by your model id like cogagent-chat-18b
     return ModelList(data=[model_card])
 
 
@@ -378,6 +397,7 @@ if __name__ == "__main__":
     print("========Use torch type as:{} with device:{}========\n\n".format(torch_type, DEVICE))
 
     if 'cuda' in DEVICE:
+    # if DEVICE != 'cpu':
         if QUANT_ENABLED:
             model = AutoModelForCausalLM.from_pretrained(
                 MODEL_PATH,
@@ -397,4 +417,4 @@ if __name__ == "__main__":
             
     else:
         model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, trust_remote_code=True).float().to(DEVICE).eval()
-    uvicorn.run(app, host='0.0.0.0', port=8000, workers=1)
+    uvicorn.run(app, host='0.0.0.0', port=PORT, workers=1)

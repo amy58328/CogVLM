@@ -10,3 +10,6 @@ archive*
 hostfile
 runs/
 *.idea/
+cogagent-vqa-hf/
+cogvlm-grounding-generalist-hf/
+
