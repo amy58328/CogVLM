@@ -9,7 +9,8 @@ import requests
 import json
 import base64
 
-base_url = "http://127.0.0.1:8000"
+
+
 
 
 def create_chat_completion(model, messages, temperature=0.8, max_tokens=2048, top_p=0.8, use_stream=False):
@@ -94,7 +95,7 @@ def simple_image_chat(use_stream=True, img_path=None):
             "content": [
                 {
                     "type": "text",
-                    "text": "scissors",
+                    "text": quation,
                 },
                 {
                     "type": "image_url",
@@ -117,4 +118,16 @@ def simple_image_chat(use_stream=True, img_path=None):
 
 
 if __name__ == "__main__":
-    simple_image_chat(use_stream=False, img_path="../CogVLM testdata/1.png")
+
+    while True:
+        try:
+            PORT = input("enter port, VQA:8080, ground:3030\n")
+            base_url = f"http://127.0.0.1:{PORT}"
+
+            img_URL = input("enter the path to image\n")
+            quation = input('enter the quation\n')
+        except:
+            base_url = "http://127.0.0.1:8000"
+
+        simple_image_chat(use_stream=False, img_path=img_URL)
+        print()
