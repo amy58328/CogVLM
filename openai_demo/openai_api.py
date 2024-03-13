@@ -21,7 +21,7 @@ import sys
 # get model name from input
 try:
     model_name = sys.argv[1]
-    MODEL_PATH = os.environ.get('MODEL_PATH', f'../{model_name}')
+    MODEL_PATH = os.environ.get('MODEL_PATH', f'{model_name}')
     PORT = sys.argv[2]
     
 except:
