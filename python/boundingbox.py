@@ -1,6 +1,8 @@
 import cv2
 
-image = cv2.imread('../CogVLM testdata/22.jpg')
+# img_path = input("input image")
+img_path = '16.jpg'
+image = cv2.imread(f'../CogVLM testdata/{img_path}')
 
 h = image.shape[0]
 w = image.shape[1]
@@ -16,7 +18,7 @@ x2, y2 = int(input_arr[2]), int(input_arr[3])
 
 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2) 
 
-image = cv2.resize(image,(w,h))
+# image = cv2.resize(image,(w,h))
 
 cv2.imshow('Image with Box', image)
 cv2.waitKey(0)
