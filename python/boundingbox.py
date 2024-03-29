@@ -1,6 +1,6 @@
 import cv2
 
-image = cv2.imread('../CogVLM testdata/17.jpg')
+image = cv2.imread('../CogVLM testdata/22.jpg')
 
 h = image.shape[0]
 w = image.shape[1]
