@@ -3,7 +3,7 @@ import cv2
 while True:
     img_path = input("input image")
     # img_path = '14.jpg'
-    image = cv2.imread(f'../CogVLM testdata/{img_path}.jpg')
+    image = cv2.imread(f'../CogVLM testdata/{img_path}')
 
     h = image.shape[0]
     w = image.shape[1]
