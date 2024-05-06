@@ -9,11 +9,9 @@ import requests
 import json
 import base64
 
+base_url = ""
 
-
-
-
-def create_chat_completion(model, messages, temperature=0.8, max_tokens=2048, top_p=0.8, use_stream=False):
+def create_chat_completion(model, messages, temperature=0.8, max_tokens=2048, top_p=0.8, use_stream=False,PORT=None):
     """
     This function sends a request to the chat API to generate a response based on the given messages.
 
@@ -37,8 +35,7 @@ def create_chat_completion(model, messages, temperature=0.8, max_tokens=2048, to
         "temperature": temperature,
         "top_p": top_p,
     }
-
-    response = requests.post(f"{base_url}/v1/chat/completions", json=data, stream=use_stream)
+    response = requests.post(f"http://127.0.0.1:{PORT}/v1/chat/completions", json=data, stream=use_stream)
     if response.status_code == 200:
         if use_stream:
             # 处理流式响应
@@ -55,11 +52,11 @@ def create_chat_completion(model, messages, temperature=0.8, max_tokens=2048, to
             # 处理非流式响应
             decoded_line = response.json()
             content = decoded_line.get("choices", [{}])[0].get("message", "").get("content", "")
-            print(content)
+            # print(content)
     else:
         print("Error:", response.status_code)
         return None
-
+    return content
 
 def encode_image(image_path):
     """
@@ -75,7 +72,7 @@ def encode_image(image_path):
         return base64.b64encode(image_file.read()).decode("utf-8")
 
 
-def simple_image_chat(use_stream=True, img_path=None):
+def simple_image_chat(use_stream=True, img_path=None,question=None,PORT=None):
     """
     Facilitates a simple chat interaction involving an image.
 
@@ -95,7 +92,7 @@ def simple_image_chat(use_stream=True, img_path=None):
             "content": [
                 {
                     "type": "text",
-                    "text": quation,
+                    "text": question,
                 },
                 {
                     "type": "image_url",
@@ -105,29 +102,18 @@ def simple_image_chat(use_stream=True, img_path=None):
                 },
             ],
         },
-        # {
-        #     "role": "assistant",
-        #     "content": "The image displays a wooden boardwalk extending through a vibrant green grassy wetland. The sky is partly cloudy with soft, wispy clouds, indicating nice weather. Vegetation is seen on either side of the boardwalk, and trees are present in the background, suggesting that this area might be a natural reserve or park designed for ecological preservation and outdoor recreation. The boardwalk allows visitors to explore the area without disturbing the natural habitat.",
-        # },
-        # {
-        #     "role": "user",
-        #     "content": "where is the dog?"
-        # },
     ]
-    create_chat_completion("cogvlm-chat-17b", messages=messages, use_stream=use_stream)
+    return create_chat_completion("cogvlm-chat-17b", messages=messages, use_stream=use_stream,PORT=PORT)
 
 
-if __name__ == "__main__":
+def get_Coordinates(EXTRACT_OBJECT,IMG_PATH):
+    # determine object
+    answer = simple_image_chat(use_stream=False, img_path=IMG_PATH, question=EXTRACT_OBJECT,PORT = "8080")
 
-    while True:
-        try:
-            PORT = input("enter port, VQA:8080, ground:3030\n")
-            base_url = f"http://127.0.0.1:{PORT}"
+    # position object
+    input_question = F"Where is {answer}? answer in [[x0,y0,x1,y1]] format."
+    answer = simple_image_chat(use_stream=False, img_path=IMG_PATH, question=input_question,PORT = "3030")
 
-            img_URL = input("enter the path to image\n")
-            quation = input('enter the quation\n')
-        except:
-            base_url = "http://127.0.0.1:8000"
-
-        simple_image_chat(use_stream=False, img_path=img_URL)
-        print()
+    # print(answer)
+    # print("==========================")
+    return answer
