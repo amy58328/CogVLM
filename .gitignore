@@ -12,4 +12,5 @@ runs/
 *.idea/
 cogagent-vqa-hf/
 cogvlm-grounding-generalist-hf/
-
+Bert fine tune/
+cogvlm-chat-hf/

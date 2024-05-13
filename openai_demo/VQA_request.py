@@ -72,7 +72,7 @@ def encode_image(image_path):
         return base64.b64encode(image_file.read()).decode("utf-8")
 
 
-def simple_image_chat(use_stream=False, img_path=None,question=None,PORT=None):
+def simple_image_chat(use_stream=True, img_path=None,question=None,PORT=None):
     """
     Facilitates a simple chat interaction involving an image.
 
@@ -86,7 +86,6 @@ def simple_image_chat(use_stream=False, img_path=None,question=None,PORT=None):
     """
 
     img_url = f"data:image/jpeg;base64,{encode_image(img_path)}"
-
     messages = [
         {
             "role": "user",
@@ -104,35 +103,31 @@ def simple_image_chat(use_stream=False, img_path=None,question=None,PORT=None):
             ],
         },
     ]
-
     return create_chat_completion("cogvlm-chat-17b", messages=messages, use_stream=use_stream,PORT=PORT)
 
 
-# def get_Coordinates(Question,IMG_PATH,PORT):
+def get_Coordinates(EXTRACT_OBJECT,IMG_PATH):
 
-#     answer = simple_image_chat(use_stream=False, img_path=IMG_PATH, question=Question,PORT = PORT)
+    answer = "<EOI>"
+    # determine object
+    while answer == "<EOI>":
+        answer = simple_image_chat(use_stream=False, img_path=IMG_PATH, question=EXTRACT_OBJECT,PORT = "8080")
 
-#     # answer = "<EOI>"
-#     # # determine object
-#     # while answer == "<EOI>":
-#     #     # analyze nouns
-#     #     if analyze:
-#     #         input_question = EXTRACT_OBJECT
-#     #         answer = simple_image_chat(use_stream=False, img_path=IMG_PATH, question=input_question,PORT = "8080")
+    # # position object
+    # input_question = F"Where is {answer}? answer in [[x0,y0,x1,y1]] format."
+    # answer = simple_image_chat(use_stream=False, img_path=IMG_PATH, question=input_question,PORT = "3030")
 
-#     #         EXTRACT_OBJECT = answer.split('is')[-1].split(".")[0]
-#     #         print(f"the analyze is : {answer}")
-        
-#     #     # check if exist
-#     #     input_question = f"is there any {EXTRACT_OBJECT} in the image?"
-#     #     answer = simple_image_chat(use_stream=False, img_path=IMG_PATH, question=input_question,PORT = "8080")
-#     #     if ("No" in answer):
-#     #         return -1
-        
-#     #     # position object
-#     #     input_question = F"Where is one of the {EXTRACT_OBJECT}? answer in [[x0,y0,x1,y1]] format."
-#     #     answer = simple_image_chat(use_stream=False, img_path=IMG_PATH, question=input_question,PORT = "3030")
+    print(answer)
+    # print("==========================")
+    # return answer
 
-#     # print(answer)
-#     # print("==========================")
-#     return answer
+
+
+
+
+while True:
+
+    IMG_PATH = './IMG.jpg'
+    EXTRACT_OBJECT = input("VQA, enter the word:")
+
+    get_Coordinates(EXTRACT_OBJECT,IMG_PATH)
