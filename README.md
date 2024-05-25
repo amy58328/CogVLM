@@ -1,3 +1,7 @@
+# commit comparision
+| commit | new | revise | remark |
+|:-------|:-----|:------ | - |
+|cal center point | 1.Controller.py new a Class named Coordinate. |1. revise the Controller.py, cal the center point, for RL and repositioning.| - |
 # CogVLM & CogAgent
 
 📗 [中文版README](./README_zh.md)
