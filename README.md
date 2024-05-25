@@ -2,6 +2,7 @@
 | commit | new | revise | remark |
 |:-------|:-----|:------ | - |
 |cal center point | 1.Controller.py new a Class named Coordinate. |1. revise the Controller.py, cal the center point, for RL and repositioning.| - |
+| pixel to word | - |1. pixel coordination to word coordination| - |
 # CogVLM & CogAgent
 
 📗 [中文版README](./README_zh.md)

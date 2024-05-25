@@ -19,6 +19,7 @@ filesize = None
 INPUT_COMMAND = None
 IMG_PATH = None
 repositioning = False
+location_point = []
 
 
 def __init__():
@@ -31,6 +32,7 @@ def __init__():
     INPUT_COMMAND = None
     IMG_PATH = None
     repositioning = False
+    location_point = []
     
 
 class Client:
@@ -47,7 +49,7 @@ class Client:
         self.client.subscribe(self.sub_list)
 
     def on_message(self, client, userdata, msg):
-        global filesize,IMG_PATH,repositioning,fp
+        global filesize,IMG_PATH,repositioning,fp,location_point
 
         if (msg.topic == "INPUT_COMMAND"):
             print("get message")
@@ -92,9 +94,11 @@ class Client:
                     
 
 
-                    self.publish("reposition_p",f"{red_center},{blue_center}")
+                    # self.publish("reposition_p",f"{red_center},{blue_center}")
                     print(f"red center = {red_center}, blue center = {blue_center}")
-                  
+                    location_point = [red_center,blue_center]
+                    print("command done, please enter the next command.")
+                    print("==============================================")
 
 
 
@@ -171,12 +175,21 @@ class Command:
         # get direct object's coordiante
         # print(f"name = {i['name']}, coordinate = {i['coordinate']}")
 
-        if (i['center_point'] == None):
+        if (i['center_point'] == None ):
             coor = Coordinate(i['name'])
+            
+            # Pixel coordiante
             i['center_point'] = coor.get_center_coordiante()
 
             if (i['center_point'] == -1):
                 print(f"{i['name']} is not in the image")
+                return 
+
+            i['center_point'] = coor.chang_pixel_to_word(i['center_point'])
+
+            if (i['center_point'] == -1):
+                print(f"{i['name']} pixel to word fail.")
+                return 
 
         # while not self.check_formate(i['coordinate']):
 
@@ -200,7 +213,13 @@ class Command:
 
             if (self.indirect_dict['center_point'] == -1):
                 print(f"{self.indirect_dict['name']} is not in the image")
-
+                return 
+            
+            self.indirect_dict['center_point'] = coor.chang_pixel_to_word(self.indirect_dict['center_point'])
+            
+            if (self.indirect_dict['center_point'] == -1):
+                print(f"{self.indirect_dict['name']} pixel to word fail.")
+                return
         # while not self.check_formate(self.indirect_dict['coordinate']):
 
         #     coordiante = self.get_coordinate(self.indirect_dict['name'])
@@ -319,9 +338,9 @@ class Coordinate:
         # check if exist
         input_question = f"is there any {VQA_result} in the image?"
         Exist_result = self.VQA(input_question)
+        print(f"the Exist_result is : {Exist_result}")
         if ("No" in Exist_result):
             return -1
-        print(f"the Exist_result is : {Exist_result}")
         
         
         # Grounding
@@ -347,14 +366,54 @@ class Coordinate:
 
                   
     def check_formate(self, s):
-        if (s == None):
+        if (s == None ):
             return False
+        
+        if (s == -1):
+            return True
         
         # (-?\d+(\.\d+)?) means number, int or float
         # template = [[x0,y0,x1,y1]]
         template = r'\[\[(-?\d+(\.\d+)?),(-?\d+(\.\d+)?),(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)\]\]'
 
         return re.match(template,s)
+    
+    def chang_pixel_to_word(self,p):
+        global location_point
+
+        if location_point == []:
+            print("please reposition first")
+            return -1
+        
+        p = [int(i) for i in p.strip("()").split(',')]
+
+        imgx = p[0]
+        imgy = p[1]
+
+        p1 = [int(i) for i in location_point[0].strip("()").split(",")]
+        p2 = [int(i) for i in location_point[1].strip("()").split(",")]
+
+        imgx = p[0]
+        imgy = p[1]
+
+        p1x = p1[0]
+        p1y = p1[1]
+
+        p2x = p2[0]
+        p2y = p2[1]
+
+        r1x = 2
+        r1y = 2
+
+        r2x = 1
+        r2y = 1
+
+        wx = ((imgx-p1x) * ((p1x - p2x)/(r1x - r2x))) + r1x
+        wy = ((imgy-p1y) * ((p1y - p2y)/(r1y - r2y))) + r1y
+
+        # return f"({wx},{wy})"
+        return f"({imgx,imgy})"
+
 
 def __main__():
 
