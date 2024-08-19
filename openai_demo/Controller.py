@@ -362,7 +362,7 @@ class Coordinate:
 
         return re.match(template,s)
     
-    def chang_pixel_to_word(self,p):
+    def chang_pixel_to_world(self,p):
         p = [int(i) for i in p.strip("()").split(',')]
 
         imgx = p[0]
@@ -376,6 +376,7 @@ class Coordinate:
         # red
         p2x = 705
         p2y = 656
+
         # blue        
         r1x = 0.55975
         r1y = 0.28234
@@ -401,6 +402,7 @@ def __main__():
     client = Client(MQTT_IP,MQTT_PORT,"james01","0101xx",[("INPUT_COMMAND",2),("IMG",2),("IMG_SIZE",2),("Repositioning",2),("VQA_result",2)])
     mqtt_thread = threading.Thread(target=client.loop)
     mqtt_thread.start()
+
     while True:
         __init__()
         while True:
