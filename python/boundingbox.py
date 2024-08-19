@@ -1,9 +1,9 @@
 import cv2
 
 while True:
-    img_path = input("input image")
+    # img_path = input("input image：")
     # img_path = '14.jpg'
-    image = cv2.imread(f'../CogVLM testdata/{img_path}')
+    image = cv2.imread(f'./temp.jpg')
 
     h = image.shape[0]
     w = image.shape[1]
@@ -11,7 +11,7 @@ while True:
 
     image = cv2.resize(image,(998 ,998))
 
-    input_arr = input("input coordinate").strip('[]').split(',')
+    input_arr = input("input coordinate：").strip('[]').split(',')
 
     x1, y1 = int(input_arr[0]), int(input_arr[1])  
     x2, y2 = int(input_arr[2]), int(input_arr[3])  
