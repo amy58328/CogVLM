@@ -2,13 +2,12 @@ import requests
 import paho.mqtt.client as mqtt
 import threading
 import re
-import numpy as np
-import cv2
 import time
 import os
 from word2number import w2n
 from openai_api_request import simple_image_chat
-
+import re
+from datetime import datetime
 
 MQTT_IP = "140.124.182.78"
 MQTT_PORT = 1883
@@ -19,20 +18,16 @@ filesize = None
 INPUT_COMMAND = None
 IMG_PATH = None
 repositioning = False
-location_point = []
-
+client = None
 
 def __init__():
-    global new_filename,fp,filesize,INPUT_COMMAND,IMG_PATH,repositioning
+    global new_filename,fp,filesize,INPUT_COMMAND,IMG_PATH,VQA_sult
 
-    new_filename = os.path.join('./IMG.jpg')
-    fp = open(new_filename, 'wb') 
+
     filesize = 0
 
     INPUT_COMMAND = None
     IMG_PATH = None
-    repositioning = False
-    location_point = []
     
 
 class Client:
@@ -49,21 +44,34 @@ class Client:
         self.client.subscribe(self.sub_list)
 
     def on_message(self, client, userdata, msg):
-        global filesize,IMG_PATH,repositioning,fp,location_point
+        global filesize,IMG_PATH,fp,new_filename,repositioning,INPUT_COMMAND,start_time
 
-        if (msg.topic == "INPUT_COMMAND"):
+        if (msg.topic == "INPUT_COMMAND" ):
             print("get message")
-            __init__()
+            # record machine thinking time
+            start_time = datetime.now()
+            # if (VQA_sult != None):
+            #     ori_command = VQA_sult
+            # else:
+            ori_command = str(msg.payload).split('\'')[1].strip()
 
-            ori_command = str(msg.payload).split('\'')[1]
+            
             print(f"ori_command = {ori_command}")
 
-            info = {'command':ori_command}
-            response = requests.post("http://127.0.0.1:5050/",json=info)
+            command = f"what is the verbs, direct objects, and indirect objects of this sentence:\n{ori_command}\n"
+            response = requests.post("http://127.0.0.1:5050/",json={'command':command})
             print(f"llama2 result = {response.json()}")
 
-            global INPUT_COMMAND
             INPUT_COMMAND = response.json()
+            # VQA_sult = None
+
+        if (msg.topic == "VQA_result"):
+            VQA_sult = str(msg.payload).split('\'')[1].strip()
+            print(f"VQA_sult = {VQA_sult}")
+            
+            IMG_PATH = None
+            self.client.publish("INPUT_COMMAND",VQA_sult)
+
 
         elif msg.topic == "IMG":
             fp.write(msg.payload)
@@ -95,21 +103,24 @@ class Client:
 
 
                     # self.publish("reposition_p",f"{red_center},{blue_center}")
-                    print(f"red center = {red_center}, blue center = {blue_center}")
-                    location_point = [red_center,blue_center]
+                    print(f"blue center = {blue_center}, red center = {red_center}")
+                    location_point = [blue_center,red_center]
                     print("command done, please enter the next command.")
                     print("==============================================")
 
-
-
-
         elif msg.topic == "IMG_SIZE":
+            # __init__()
+            new_filename = os.path.join('./IMG.jpg')
+            fp = open(new_filename, 'wb') 
             filesize = int(msg.payload)
 
-            # __init__()
 
+        # elif msg.topic == "VQA_result":
+        #     global VQA_result
 
+        #     VQA_result = str(msg.payload).split('\'')[1]
         elif msg.topic == "Repositioning":
+        
             __init__()
 
             repositioning = True
@@ -125,53 +136,77 @@ class Client:
 
 class Command:
     def __init__(self, input_command):
-        # verb
-        input_command = input_command.split("[")
-        self.verb = input_command[1].replace(",","")
+        # split out all commands
+        # remove the {} from the beginning and the end
+        input_command = input_command.strip('{}')
 
-        input_command = input_command[2].split("]")
+        # split out the commands from the input_command
+        command_list = input_command.split("],[")
 
-        # direct_list
-        # [
-        #     {
-        #         'name':str,
-        #         'coordinate':str,[[x0,y0,x1,y1]]
-        #     },
-        #     ...
-        # ]
-        direct_tmp = input_command[0].split(',')
-        direct_list= []
-        for i in direct_tmp:
-            dict = {}
-            dict["name"] = i
-            dict["center_point"] = None
-            direct_list.append(dict)
+        # remove the [] from the beginning and the end of each command
+        commands = [i.strip('[]') for i in command_list]
 
-        self.direct_list = direct_list
-        # self.direct_num = len(direct_list)
-        
+        # Use dict to wrap each command and store it in list
+        command_list = []
 
-        # indirect_dict
-        # {
-        #     'assign':bool, 
-        #     'name':str,string or ''
-        #     'coordinate':str,None or [[x0,y0,x1,y1]]
-        # },
-        indirect_dict = {}
+        for command in commands:
+            
+            
+            command_split = re.split(r"\[|\]",command)
 
-        indirect_dict['name'] = self.wordTonumber(input_command[1].replace(",",""))
+            # verb
+            verb = command_split[0].replace(',','')
 
-        if (indirect_dict['name'] == ''):
-            indirect_dict['assign'] = False
-        else:
-            indirect_dict['assign'] = True
 
-        indirect_dict['center_point'] = None
+            # directs
+            directs = command_split[1]
+            # direct_list
+            # [
+            #     {
+            #         'name':str,
+            #         'center_point':str,[[x0,y0,x1,y1]]
+            #     },
+            #     ...
+            # ]
+            direct_list = []
+            for d in directs.split(','):
+                dict = {}
+                dict["name"] = d
+                dict["center_point"] = None
+                direct_list.append(dict)
 
-        self.indirect_dict = indirect_dict
+            # place
+            place = {}
+            
+            # indirect_dict
+            # {
+            #     'assign':bool, 
+            #     'name':str,string or None
+            #     'center_point':str,None or [[x0,y0,x1,y1]]
+            # },
+
+            #  has a assign place
+            if len(command_split) > 2:
+                place["name"] = command_split[2].replace(',','')
+                place["assign"] = True
+            else:
+                place["name"] = None
+                place["assign"] = False
+            place["center_point"] = None
+
+            # assemble command
+            for i in direct_list:
+                temp_command = {}
+                temp_command["verb"] = verb
+                temp_command["direct"] = i
+                temp_command["place"] = place
+                command_list.append(temp_command)
+
+        self.command_list = command_list
 
     def get_direct_coordinate(self,i):
         print("get direct center_point")
+        print(f"i = {i}")
         # get direct object's coordiante
         # print(f"name = {i['name']}, coordinate = {i['coordinate']}")
 
@@ -191,54 +226,26 @@ class Command:
                 print(f"{i['name']} pixel to word fail.")
                 return 
 
-        # while not self.check_formate(i['coordinate']):
 
-
-        #     coordiante = self.get_coordinate(i['name'])
-
-        #     i['coordinate'] = coordiante
-
-        #     if (coordiante == -1):
-        #         print(f"{i['name']} is not in the image")
-        #         break
-
-
-    def get_indirect_coordinate(self):
-        if not self.indirect_dict['assign']:
+    def get_indirect_coordinate(self,i):
+        if not i['assign']:
+            i['center_point'] = -1
             return 
         
-        if (self.indirect_dict['center_point'] == None):
-            coor = Coordinate(self.indirect_dict['name'])
-            self.indirect_dict['center_point'] = coor.get_center_coordiante()
+        if (i['center_point'] == None):
+            coor = Coordinate(i['name'])
+            i['center_point'] = coor.get_center_coordiante()
 
-            if (self.indirect_dict['center_point'] == -1):
-                print(f"{self.indirect_dict['name']} is not in the image")
+            if (i['center_point'] == -1):
+                print(f"{i['name']} is not in the image")
                 return 
             
-            self.indirect_dict['center_point'] = coor.chang_pixel_to_word(self.indirect_dict['center_point'])
+            i['center_point'] = coor.chang_pixel_to_word(i['center_point'])
             
-            if (self.indirect_dict['center_point'] == -1):
-                print(f"{self.indirect_dict['name']} pixel to word fail.")
+            if (i['center_point'] == -1):
+                print(f"{i['name']} pixel to word fail.")
                 return
-        # while not self.check_formate(self.indirect_dict['coordinate']):
 
-        #     coordiante = self.get_coordinate(self.indirect_dict['name'])
-
-        #     self.indirect_dict['coordinate'] = coordiante
-
-        #     if (coordiante == -1):
-        #         print(f"{self.indirect_dict['name']} is not in the image")
-        #         break
-
-    # def check_formate(self, s):
-    #     if (s == None):
-    #         return False
-        
-    #     # (-?\d+(\.\d+)?) means number, int or float
-    #     # template = [[x0,y0,x1,y1]]
-    #     template = r'\[\[(-?\d+(\.\d+)?),(-?\d+(\.\d+)?),(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)\]\]'
-
-    #     return re.match(template,s)
 
     def wordTonumber(self,ori_str):
         if (ori_str == ""):
@@ -257,48 +264,13 @@ class Command:
                 temp_list.append(i)
 
         return " ".join(temp_list) + "."
-    
-    # def get_coordinate(self,ori_narrate):
-    #     #  need reasoning or not
-    #     if len(ori_narrate)> 15:
-    #         VQA_result = simple_image_chat(img_path=IMG_PATH, question=ori_narrate,PORT = "8080")
-
-    #         VQA_result = VQA_result.split('is')[-1].split(".")[0]
-    #     else:
-    #         VQA_result = ori_narrate
-    #     print(f"the VQA_result is : {VQA_result}")
-
-    #     # check if exist
-    #     input_question = f"is there any {VQA_result} in the image?"
-    #     Exist_result = simple_image_chat(img_path=IMG_PATH, question=input_question,PORT = "8080")
-    #     if ("No" in Exist_result):
-    #         return -1
-    #     print(f"the Exist_result is : {Exist_result}")
-        
-        
-    #     # Grounding
-    #     if (" is " in Exist_result):
-    #         input_question = F"Where is {VQA_result}? answer in [[x0,y0,x1,y1]] format."
-    #     else:
-    #         input_question = F"Where is one of the {VQA_result}? answer in [[x0,y0,x1,y1]] format."
-
-    #     Grounding_result = simple_image_chat(img_path=IMG_PATH, question=input_question,PORT = "3030")
-    #     print(f"the Grounding_result is : {Grounding_result}")
-
-    #     return Grounding_result
-    
-    # def Cal_center_point(self,coordantes):
-    #     coordantes = coordantes.replace("[","").replace("]","")
-    #     a = [int(i) for i in coordantes.split(',')]
-    #     c_x = int((a[0]+a[2])/2)
-    #     c_y = int((a[1]+a[3])/2)
-    #     return f"({c_x},{c_y})"
 
 class Coordinate:
     global IMG_PATH
 
     def __init__(self,item_name=None):
         self.item_name = item_name
+        print(F"item name = {item_name}")
     
     def get_center_coordiante(self):
         bounding_coordinate = None
@@ -324,30 +296,40 @@ class Coordinate:
     
     def get_item_Bounding_coordinate(self):
 
-        ori_narrate = self.item_name
+        command = f"Is the sentence {self.item_name} a sentence describing objects?\n"
+        describing_object = requests.post("http://127.0.0.1:2020/",json={'command':command}).json()
+        print(f"describing_object = {describing_object}")
 
+        need_reasoning = False
+        if describing_object == "no":
+            need_reasoning = True
+
+        VQA_result = self.item_name
         #  need reasoning or not
-        if len(ori_narrate)> 15:
-            VQA_result = self.VQA(ori_narrate)
+        if need_reasoning == True:
+            VQA_result = self.VQA(self.item_name.replace(".",""))
+            
+            if ("divided" in VQA_result):
+                VQA_result = VQA_result.split("is")[-1]
+                VQA_result = VQA_result.split(".")[0]
+                VQA_result = VQA_result.replace("approximately","")
 
-            VQA_result = VQA_result.split('is')[-1].split(".")[0]
-        else:
-            VQA_result = ori_narrate
-        print(f"the VQA_result is : {VQA_result}")
+            print(f"the VQA_result is : {VQA_result}")
+        # else:
+        #     input_question = f"is there any {self.item_name} in the image?"
+        #     VQA_result = self.VQA(input_question)
 
-        # check if exist
-        input_question = f"is there any {VQA_result} in the image?"
-        Exist_result = self.VQA(input_question)
-        print(f"the Exist_result is : {Exist_result}")
-        if ("No" in Exist_result):
-            return -1
         
+        # if ("No" in VQA_result):
+        #     return -1
+        
+        VQA_result = VQA_result.replace("Yes,",'')
         
         # Grounding
-        if (" is " in Exist_result):
-            input_question = F"Where is {VQA_result}? answer in [[x0,y0,x1,y1]] format."
-        else:
-            input_question = F"Where is one of the {VQA_result}? answer in [[x0,y0,x1,y1]] format."
+        # if need_reasoning == False:
+        #     input_question = F"Where is {self.item_name}? answer in [[x0,y0,x1,y1]] format."
+        # else:
+        input_question = F"Where is {VQA_result}? answer in [[x0,y0,x1,y1]] format."
 
         Grounding_result = self.Grounding(input_question)
         print(f"the Grounding_result is : {Grounding_result}")
@@ -355,6 +337,8 @@ class Coordinate:
         return Grounding_result
     
     def VQA(self,input_str):
+        # print(f"VQA_COMMAND = {input_str}")
+        # client.publish("VQA_COMMAND",input_str)
         VQA_result = simple_image_chat(img_path=IMG_PATH, question=input_str,PORT = "8080")
 
         return VQA_result
@@ -379,75 +363,80 @@ class Coordinate:
         return re.match(template,s)
     
     def chang_pixel_to_word(self,p):
-        global location_point
-
-        if location_point == []:
-            print("please reposition first")
-            return -1
-        
         p = [int(i) for i in p.strip("()").split(',')]
 
         imgx = p[0]
         imgy = p[1]
 
-        p1 = [int(i) for i in location_point[0].strip("()").split(",")]
-        p2 = [int(i) for i in location_point[1].strip("()").split(",")]
 
-        imgx = p[0]
-        imgy = p[1]
+        # blue        
+        p1x = 583
+        p1y = 413
 
-        p1x = p1[0]
-        p1y = p1[1]
+        # red
+        p2x = 705
+        p2y = 656
+        # blue        
+        r1x = 0.55975
+        r1y = 0.28234
 
-        p2x = p2[0]
-        p2y = p2[1]
+        # red
+        r2x = 0.45706
+        r2y = 0.20859
 
-        r1x = 2
-        r1y = 2
+        # defeul
+        d_x = 1.5
+        d_y = 1.15
 
-        r2x = 1
-        r2y = 1
+        wx = ((imgx-p1x) * (((r2y - r1y)/(p2x - p1x)) * d_x)) + r1y
+        wy = ((imgy-p1y) * (((r2x - r1x)/(p2y - p1y)) * d_y)) + r1x
 
-        wx = ((imgx-p1x) * ((p1x - p2x)/(r1x - r2x))) + r1x
-        wy = ((imgy-p1y) * ((p1y - p2y)/(r1y - r2y))) + r1y
-
-        # return f"({wx},{wy})"
-        return f"({imgx,imgy})"
+        return f"({wx},{wy})"
 
 
 def __main__():
 
-    __init__()
     global INPUT_COMMAND,IMG_PATH,client
 
-    client = Client(MQTT_IP,MQTT_PORT,"james01","0101xx",[("INPUT_COMMAND",2),("IMG",2),("IMG_SIZE",2),("Repositioning",2)])
+    client = Client(MQTT_IP,MQTT_PORT,"james01","0101xx",[("INPUT_COMMAND",2),("IMG",2),("IMG_SIZE",2),("Repositioning",2),("VQA_result",2)])
     mqtt_thread = threading.Thread(target=client.loop)
     mqtt_thread.start()
     while True:
-
+        __init__()
         while True:
             if INPUT_COMMAND != None and IMG_PATH != None:
                 break
-        
+
+
         command = Command(INPUT_COMMAND)
 
-        for i in command.direct_list: 
-            #  get direct coordinate 
-            # print("get direct coorddinate")
-            command.get_direct_coordinate(i)
-            print(i , "\n")
+        for single_command in command.command_list:
+            print(f"single_command = {single_command}")
+
+            # for i in single_command["direct_list"]: 
+                #  get direct coordinate 
+                # print("get direct coorddinate")
+            command.get_direct_coordinate(single_command['direct'])
+            print(single_command['direct'] , "\n")
+
+            if (single_command['direct']['center_point'] == -1):
+                print("direct not found, Command Fail.")
+                continue
+            #client.publish('RL_target_location',)
+
 
             # print("get indirect coorddinate")
-            command.get_indirect_coordinate()
-            print(command.indirect_dict, "\n")
+            command.get_indirect_coordinate(single_command["place"])
+            print(single_command["place"], "\n")
+            if (single_command['place']['assign'] == True and single_command['place']['center_point'] == -1):
+                print("Indirect not found, Command Fail.")
+                continue
 
-            # send coordinate to RL
-            if (command.indirect_dict['assign'] == False):
-                send_str = f"({i['center_point']})"
-            else:
-                send_str = f"({i['center_point']},{command.indirect_dict['center_point']})"
-
-            client.publish('RL',send_str)
+            client.publish('RL_target_location',f"({single_command['direct']['center_point']},{single_command['place']['center_point']})")
+       
+        stop_time = datetime.now()
+        different_time = (stop_time - start_time).total_seconds()
+        client.publish("machine thinking time",f"{different_time}")
 
 
 
